@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub 網址百寶箱</title>
+<meta name="description" content="從 CSV 檔動態讀取的 GitHub Pages 網址瀏覽與搜尋網頁">
+<style>
+:root{
+  --bg1:#fff7e6; --bg2:#e8f7ff; --bg3:#f3ecff;
+  --ink:#2b2d42; --muted:#5c6178; --card:#ffffff;
+  --pink:#ff5d8f; --orange:#ff9f1c; --yellow:#ffd23f; --green:#2ec4b6;
+  --blue:#3a86ff; --purple:#8338ec; --red:#ef476f;
+  --radius:22px; --shadow:0 8px 24px rgba(60,40,120,.12);
+  --fs:19px;
+}
+*{box-sizing:border-box}
+html{font-size:var(--fs)}
+body{
+  margin:0; color:var(--ink);
+  font-family:"Microsoft JhengHei","微軟正黑體","Noto Sans TC","PingFang TC",sans-serif;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2) 50%,var(--bg3));
+  background-attachment:fixed; min-height:100vh; line-height:1.6;
+}
+/* 背景漂浮泡泡（純 CSS，無圖片） */
+.bubbles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bubbles span{position:absolute;bottom:-120px;border-radius:50%;opacity:.28;animation:rise linear infinite}
+@keyframes rise{to{transform:translateY(-120vh) rotate(360deg)}}
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:0 16px 80px}
+
+header{padding:28px 0 12px;text-align:center}
+.logo{display:inline-flex;align-items:center;gap:14px;cursor:pointer;user-select:none}
+.logo .cube{width:62px;height:62px;border-radius:18px;display:grid;place-items:center;font-size:2rem;
+  background:conic-gradient(var(--pink),var(--orange),var(--yellow),var(--green),var(--blue),var(--purple),var(--pink));
+  box-shadow:var(--shadow);animation:spin 10s linear infinite}
+.logo .cube b{background:#fff;border-radius:12px;width:44px;height:44px;display:grid;place-items:center;animation:spin 10s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+h1{margin:0;font-size:2.2rem;letter-spacing:2px;
+  background:linear-gradient(90deg,var(--pink),var(--orange),var(--green),var(--blue),var(--purple));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);margin:6px 0 0;font-size:1.05rem}
+
+.stats{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:18px 0}
+.stat{background:var(--card);border-radius:18px;padding:10px 20px;box-shadow:var(--shadow);min-width:130px;text-align:center;border-bottom:5px solid var(--c)}
+.stat .n{font-size:1.8rem;font-weight:800;color:var(--c)}
+.stat .l{font-size:.95rem;color:var(--muted)}
+
+.panel{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);
+  border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:18px}
+.searchbox{display:flex;gap:10px;align-items:center}
+.searchbox .ic{font-size:1.5rem}
+#q{flex:1;font-size:1.2rem;padding:14px 18px;border-radius:16px;border:3px solid #e3e0ff;outline:none;font-family:inherit;transition:.2s;min-width:0}
+#q:focus{border-color:var(--purple);box-shadow:0 0 0 5px rgba(131,56,236,.15)}
+.btn{font-family:inherit;font-size:1rem;border:none;border-radius:14px;padding:10px 16px;cursor:pointer;font-weight:700;
+  background:#f1efff;color:var(--ink);transition:transform .12s, background .2s;white-space:nowrap}
+.btn:hover{transform:translateY(-2px)}
+.btn:active{transform:scale(.95)}
+.btn.primary{background:linear-gradient(135deg,var(--pink),var(--orange));color:#fff}
+.btn.on{background:var(--purple);color:#fff}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.tools .sep{flex:1}
+select.btn{appearance:none;padding-right:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font-family:inherit;font-size:1rem;border:3px solid var(--c);color:var(--c);background:#fff;border-radius:999px;
+  padding:6px 14px;cursor:pointer;font-weight:700;transition:.15s}
+.chip:hover{transform:translateY(-2px) rotate(-1deg)}
+.chip.on{background:var(--c);color:#fff}
+.chip small{opacity:.8;font-weight:400}
+.hint{color:var(--muted);font-size:.95rem;margin:4px 4px 12px}
+.hint kbd{background:#fff;border:2px solid #ddd;border-radius:6px;padding:0 6px;font-family:inherit}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.grid.list{grid-template-columns:1fr}
+.card{position:relative;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 18px 16px;
+  border-top:8px solid var(--c);display:flex;flex-direction:column;gap:10px;
+  animation:pop .35s ease both;transition:transform .2s, box-shadow .2s}
+.card:hover{transform:translateY(-6px) rotate(-.4deg);box-shadow:0 16px 34px rgba(60,40,120,.2)}
+@keyframes pop{from{opacity:0;transform:scale(.85) translateY(20px)}}
+.card .top{display:flex;gap:12px;align-items:flex-start}
+.emoji{flex:none;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:1.7rem;background:var(--cl)}
+.card h3{margin:0;font-size:1.2rem;line-height:1.45;word-break:break-word}
+.card h3 a{color:var(--ink);text-decoration:none}
+.card h3 a:hover{color:var(--c);text-decoration:underline}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.8rem;padding:2px 10px;border-radius:999px;background:var(--cl);color:var(--ink);font-weight:700}
+.url{font-size:.88rem;color:var(--muted);word-break:break-all}
+.versions{display:flex;flex-wrap:wrap;gap:8px}
+.ver{font-size:.95rem;text-decoration:none;color:#fff;background:var(--c);padding:6px 12px;border-radius:12px;font-weight:700;transition:.15s}
+.ver:hover{filter:brightness(1.1);transform:scale(1.06)}
+.ver.visited{box-shadow:inset 0 0 0 3px rgba(255,255,255,.7)}
+.actions{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
+.actions .btn{font-size:.9rem;padding:6px 12px}
+.fav{position:absolute;top:10px;right:12px;background:none;border:none;font-size:1.6rem;cursor:pointer;transition:transform .2s;filter:grayscale(1);opacity:.5}
+.fav.on{filter:none;opacity:1;animation:heart .4s}
+@keyframes heart{50%{transform:scale(1.5)}}
+mark{background:var(--yellow);border-radius:4px;padding:0 2px}
+.grid.list .card{flex-direction:row;align-items:center;flex-wrap:wrap}
+.grid.list .card .top{flex:1 1 320px}
+.grid.list .card .actions{margin-top:0}
+
+.empty,.loading{text-align:center;padding:60px 20px;font-size:1.3rem;color:var(--muted)}
+.loading .dots span{display:inline-block;width:16px;height:16px;border-radius:50%;margin:0 5px;animation:bounce 1s infinite}
+.loading .dots span:nth-child(2){animation-delay:.15s}.loading .dots span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{50%{transform:translateY(-18px)}}
+.drop{border:4px dashed var(--purple);border-radius:var(--radius);padding:30px;background:#fff;margin:20px auto;max-width:640px}
+
+/* 隨機探索彈窗 */
+.modal{position:fixed;inset:0;background:rgba(40,20,80,.45);display:none;place-items:center;z-index:50;padding:16px}
+.modal.show{display:grid}
+.modal .box{background:#fff;border-radius:28px;padding:28px;max-width:520px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:pop .3s}
+.slot{font-size:1.5rem;font-weight:800;min-height:5.5em;display:grid;place-items:center;padding:10px;border-radius:18px;background:var(--bg2);margin:14px 0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;
+  padding:12px 22px;border-radius:14px;font-size:1rem;z-index:60;transition:transform .3s}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.confetti{position:fixed;width:12px;height:12px;z-index:70;pointer-events:none;border-radius:3px}
+#topBtn{position:fixed;right:18px;bottom:18px;z-index:10;width:56px;height:56px;border-radius:50%;font-size:1.5rem;display:none;box-shadow:var(--shadow)}
+footer{text-align:center;color:var(--muted);font-size:.95rem;margin-top:40px}
+@media (max-width:640px){
+  :root{--fs:17px}
+  h1{font-size:1.7rem}
+  .searchbox{flex-wrap:wrap}
+  #q{flex-basis:100%}
+  .grid{grid-template-columns:1fr}
+}
+@media (max-height:900px), (max-width:640px){ .panel{position:static} }
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="bubbles" id="bubbles"></div>
+<div class="wrap">
+  <header>
+    <div class="logo" id="logo" title="點我有驚喜">
+      <div class="cube"><b>🐙</b></div>
+      <h1>GitHub 網址百寶箱</h1>
+    </div>
+    <p class="sub">一起來探索老師做的互動學習網頁吧！可以瀏覽、搜尋、收藏喔 ✨</p>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="panel" id="panel" hidden>
+    <div class="searchbox">
+      <span class="ic">🔍</span>
+      <input id="q" type="search" placeholder="輸入關鍵字搜尋，例如：英文、圖書館、2048…" autocomplete="off" aria-label="搜尋網頁">
+      <button class="btn primary" id="randomBtn">🎲 隨機探索</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tools">
+      <button class="btn" id="favOnly">❤️ 只看收藏</button>
+      <button class="btn on" id="groupBtn">📦 合併同名</button>
+      <button class="btn" id="viewBtn">📋 清單檢視</button>
+      <select class="btn" id="sort" aria-label="排序方式">
+        <option value="orig">↕️ 原始順序</option>
+        <option value="az">🔤 標題排序</option>
+        <option value="ver">🔢 版本數多→少</option>
+        <option value="hot">🔥 我最常點</option>
+      </select>
+      <span class="sep"></span>
+      <button class="btn" id="fontDown" title="縮小字體">A－</button>
+      <button class="btn" id="fontUp" title="放大字體">A＋</button>
+      <button class="btn" id="soundBtn" title="音效開關">🔊 音效開</button>
+      <button class="btn" id="reloadBtn" title="重新讀取 CSV">🔄 重新讀取</button>
+    </div>
+  </section>
+  <p class="hint" id="hint" hidden></p>
+
+  <main id="main">
+    <div class="loading"><div class="dots"><span style="background:var(--pink)"></span><span style="background:var(--green)"></span><span style="background:var(--blue)"></span></div><p>正在讀取 CSV 資料檔…</p></div>
+  </main>
+
+  <footer id="footer"></footer>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h2 style="margin:0">🎲 今天來玩這個！</h2>
+    <div class="slot" id="slot">…</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a class="btn primary" id="goBtn" target="_blank" rel="noopener" style="text-decoration:none">🚀 出發！</a>
+      <button class="btn" id="againBtn">🔁 再抽一次</button>
+      <button class="btn" id="closeBtn">✖ 關閉</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<button class="btn primary" id="topBtn" title="回到頂端">⬆</button>
+
+<script>
+/* ====== 設定：CSV 檔名（放在與 index.html 相同的資料夾） ====== */
+const CSV_FILE = 'GitHub網址與內容.csv';
+const BASE_URL_FALLBACK = 'https://isvincent.github.io/';
+
+/* ====== 小工具 ====== */
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('ghbox_'+k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('ghbox_'+k, JSON.stringify(v)); }catch(e){} }
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PALETTE = ['#ff5d8f','#ff9f1c','#2ec4b6','#3a86ff','#8338ec','#ef476f','#06a77d','#f15bb5','#00a6fb','#fb5607'];
+function hash(s){ let h=0; for(const ch of s) h=(h*31+ch.codePointAt(0))|0; return Math.abs(h); }
+function colorOf(s){ return PALETTE[hash(s)%PALETTE.length]; }
+function light(hex){ return hex+'26'; }
+
+/* ====== 音效（Web Audio 即時合成，不需外部音檔） ====== */
+let soundOn = store.get('sound', true), actx = null;
+function tone(freq, dur=.12, type='sine', vol=.15, delay=0){
+  if(!soundOn) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t+dur+.02);
+  }catch(e){}
+}
+const sfx = {
+  click(){ tone(660,.08,'triangle'); tone(990,.08,'triangle',.1,.05); },
+  open(){ [523,659,784].forEach((f,i)=>tone(f,.15,'sine',.14,i*.07)); },
+  fav(){ tone(880,.1,'sine',.15); tone(1320,.2,'sine',.12,.08); },
+  unfav(){ tone(440,.12,'sine',.12); tone(330,.15,'sine',.1,.08); },
+  tick(){ tone(1200+Math.random()*400,.03,'square',.04); },
+  win(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,.22,'triangle',.14,i*.09)); },
+  type(){ tone(500+Math.random()*300,.025,'sine',.03); },
+  none(){ tone(300,.15,'sawtooth',.06); tone(220,.2,'sawtooth',.05,.1); }
+};
+
+/* ====== 自動分類（依標題關鍵字） ====== */
+const CATS = [
+  {name:'英語學習', icon:'🔤', re:/英文|英語|單字|Word|Vocab|字苗|芽|Bingo|字母/i},
+  {name:'閱讀與圖書館', icon:'📚', re:/圖書|閱讀|讀|書|心得|編目|館藏|原子習慣|被討厭|思考，快與慢|從 A 到|非暴力|正義|三十六計|贏字/},
+  {name:'影音公播', icon:'🎬', re:/公播|影片|光影|播放器/},
+  {name:'歷史與社會', icon:'🏯', re:/歷史|乙未|1895|所有權|媒體|交通|PISA|FIFA|國家/},
+  {name:'田野與旅行', icon:'🗺️', re:/田野|日本|旅行|合掌村|東北/},
+  {name:'數理探索', icon:'🔬', re:/硬幣|電阻|顯微鏡|宇宙|蟬|排序|悖論|魔術方塊|Cube/i},
+  {name:'AI 與科技', icon:'🤖', re:/AI|AIGC|GitHub|SKILL|語音|視覺化|資訊圖表|DOI|工作流|Google|微軟|資訊素養/i},
+  {name:'遊戲闖關', icon:'🎮', re:/遊戲|2048|推盤|大富翁|冒險|闖關|探險|模擬器|任務|Bingo|Quest/i},
+  {name:'實用工具', icon:'🧰', re:/番茄鐘|計時|電子鐘|計算器|溫度計|搜尋器|查詢|課表|小黑點|注音|抽籤/},
+  {name:'課程與教學', icon:'🍎', re:/課程|教學|學習|教材|自主|新生|利用教育|小論文|PechaKucha/i},
+];
+function catsOf(title){ const r = CATS.filter(c=>c.re.test(title)).map(c=>c.name); return r.length ? r : ['其他']; }
+function iconOf(cats){ const c = CATS.find(x=>x.name===cats[0]); return c ? c.icon : '✨'; }
+
+/* ====== 狀態 ====== */
+let rows = [], groups = [];
+const state = {
+  q:'', cat:'全部', favOnly:false,
+  group: store.get('group', true), list: store.get('list', false),
+  sort: store.get('sort','orig'), fs: store.get('fs', 19)
+};
+let favs = new Set(store.get('favs', []));
+let clicks = store.get('clicks', {});
+let lastUpdated = '';
+
+/* ====== 讀取 CSV ====== */
+async function loadCSV(){
+  try{
+    // 加上時間戳記避免瀏覽器快取，確保讀到最新 CSV
+    const res = await fetch(encodeURI(CSV_FILE) + '?t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('找不到 CSV 檔（HTTP '+res.status+'）');
+    const lm = res.headers.get('last-modified');
+    lastUpdated = lm ? new Date(lm).toLocaleString('zh-TW') : '';
+    parseData(await res.arrayBuffer());
+  }catch(err){
+    console.warn(err);
+    showLocalPicker(err.message);
+  }
+}
+
+// 解碼：先試 UTF-8（含 BOM），失敗則改用 Big5（Excel 繁中版「CSV（逗號分隔）」的預設編碼）
+function decode(buf){
+  try{ return new TextDecoder('utf-8', {fatal:true}).decode(buf).replace(/^﻿/, ''); }
+  catch(e){ return new TextDecoder('big5').decode(buf); }
+}
+
+// CSV 解析：支援雙引號包住的欄位、欄位內的逗號、換行與 "" 跳脫
+function parseCSV(text){
+  const out = []; let row = [], cell = '', q = false;
+  for(let i=0; i<text.length; i++){
+    const ch = text[i];
+    if(q){
+      if(ch === '"'){ if(text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    }else if(ch === '"') q = true;
+    else if(ch === ','){ row.push(cell); cell = ''; }
+    else if(ch === '\n' || ch === '\r'){
+      if(ch === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); out.push(row); row = []; cell = '';
+    }else cell += ch;
+  }
+  if(cell || row.length){ row.push(cell); out.push(row); }
+  return out;
+}
+
+function parseData(buf){
+  const aoa = parseCSV(decode(buf));
+  // 由 D 欄標題抓出網址前綴，作為 D 欄空白時的備援
+  const headD = String((aoa[0]||[])[3]||'');
+  const m = headD.match(/https?:\/\/\S+/);
+  const base = m ? m[0] : BASE_URL_FALLBACK;
+  const headE = String((aoa[0]||[])[4]||'');
+  const mE = headE.match(/https?:\/\/\S+/);
+  rows = [];
+  aoa.slice(1).forEach((r, i) => {
+    const key = String(r[1]||'').trim();
+    const title = String(r[2]||'').trim();
+    let url = String(r[3]||'').trim();
+    if(!/^https?:\/\//i.test(url)) url = key ? base + key : '';
+    if(!title || !url) return;
+    let repo = String(r[4]||'').trim();
+    if(!/^https?:\/\//i.test(repo)) repo = (mE && key) ? mE[0] + key : '';
+    rows.push({i, key, title, url, repo, cats: catsOf(title)});
+  });
+  // 合併同名項目
+  const map = new Map();
+  rows.forEach(r => {
+    if(!map.has(r.title)) map.set(r.title, {title:r.title, cats:r.cats, items:[], i:r.i});
+    map.get(r.title).items.push(r);
+  });
+  groups = [...map.values()];
+  initUI();
+}
+
+function showLocalPicker(msg){
+  $('#main').innerHTML = `
+    <div class="drop" id="drop">
+      <p style="font-size:2.5rem;margin:0">📂</p>
+      <p><b>無法自動讀取 CSV 檔</b><br><span style="color:var(--muted)">${esc(msg)}</span></p>
+      <p style="color:var(--muted);font-size:.95rem">若是直接在電腦上雙擊開啟網頁，瀏覽器會阻擋讀檔。<br>上傳到 GitHub Pages 後就會自動讀取；或請把 CSV 檔拖曳到這裡、或按下方按鈕選擇。</p>
+      <label class="btn primary" style="display:inline-block">選擇 CSV 檔<input type="file" accept=".csv,text/csv" id="file" hidden></label>
+    </div>`;
+  const read = f => f && f.arrayBuffer().then(b => { lastUpdated = new Date(f.lastModified).toLocaleString('zh-TW'); parseData(b); });
+  $('#file').onchange = e => read(e.target.files[0]);
+  const d = $('#drop');
+  d.ondragover = e => { e.preventDefault(); d.style.background = '#f3ecff'; };
+  d.ondragleave = () => d.style.background = '#fff';
+  d.ondrop = e => { e.preventDefault(); read(e.dataTransfer.files[0]); };
+}
+
+/* ====== 介面 ====== */
+let uiReady = false;
+function initUI(){
+  $('#panel').hidden = false; $('#hint').hidden = false;
+  document.documentElement.style.setProperty('--fs', state.fs+'px');
+  $('#sort').value = state.sort;
+  $('#groupBtn').classList.toggle('on', state.group);
+  setViewBtn(); setSoundBtn();
+  renderStats(); renderChips(); render();
+  $('#footer').innerHTML = `資料來源：<b>${esc(CSV_FILE)}</b>${lastUpdated ? '　・　檔案更新時間：'+esc(lastUpdated) : ''}<br>更新 CSV 檔並上傳至 GitHub，網頁內容就會自動更新 🎉`;
+  if(uiReady) return; uiReady = true;
+
+  let typeTimer;
+  $('#q').addEventListener('input', e => {
+    sfx.type(); state.q = e.target.value.trim();
+    clearTimeout(typeTimer); typeTimer = setTimeout(render, 120);
+  });
+  $('#favOnly').onclick = e => { state.favOnly = !state.favOnly; e.currentTarget.classList.toggle('on', state.favOnly); sfx.click(); render(); };
+  $('#groupBtn').onclick = e => { state.group = !state.group; store.set('group', state.group); e.currentTarget.classList.toggle('on', state.group); sfx.click(); render(); };
+  $('#viewBtn').onclick = () => { state.list = !state.list; store.set('list', state.list); setViewBtn(); sfx.click(); render(); };
+  $('#sort').onchange = e => { state.sort = e.target.value; store.set('sort', state.sort); sfx.click(); render(); };
+  $('#fontUp').onclick = () => setFont(2);
+  $('#fontDown').onclick = () => setFont(-2);
+  $('#soundBtn').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); setSoundBtn(); sfx.click(); };
+  $('#reloadBtn').onclick = () => { sfx.click(); loadCSV().then(()=>toast('🔄 已重新讀取 CSV')); };
+  $('#randomBtn').onclick = openRandom;
+  $('#againBtn').onclick = spin;
+  $('#closeBtn').onclick = closeModal;
+  $('#modal').onclick = e => { if(e.target.id==='modal') closeModal(); };
+  $('#goBtn').onclick = () => { sfx.open(); countClick(pick.url); closeModal(); };
+  $('#logo').onclick = () => { sfx.win(); confetti(60); };
+  $('#topBtn').onclick = () => { sfx.click(); scrollTo({top:0, behavior:'smooth'}); };
+  addEventListener('scroll', () => $('#topBtn').style.display = scrollY > 500 ? 'block' : 'none');
+  document.addEventListener('keydown', e => {
+    if(e.key==='/' && document.activeElement !== $('#q')){ e.preventDefault(); $('#q').focus(); }
+    else if(e.key==='Escape'){ if($('#modal').classList.contains('show')) closeModal(); else { $('#q').value=''; state.q=''; render(); } }
+  });
+  // 卡片上的事件（事件委派）
+  $('#main').addEventListener('click', e => {
+    const a = e.target.closest('a[data-url]');
+    if(a){ sfx.open(); countClick(a.dataset.url); a.classList.add('visited'); return; }
+    const f = e.target.closest('.fav');
+    if(f){ toggleFav(f.dataset.t, f); return; }
+    const c = e.target.closest('[data-copy]');
+    if(c){ copy(c.dataset.copy); return; }
+  });
+  $('#main').addEventListener('mouseover', e => {
+    const card = e.target.closest('.card');
+    if(card && card !== lastHover){ lastHover = card; sfx.tick(); }
+  });
+}
+let lastHover = null;
+function setViewBtn(){ $('#viewBtn').textContent = state.list ? '🔲 卡片檢視' : '📋 清單檢視'; }
+function setSoundBtn(){ $('#soundBtn').textContent = soundOn ? '🔊 音效開' : '🔇 音效關'; $('#soundBtn').classList.toggle('on', !soundOn); }
+function setFont(d){
+  state.fs = Math.min(28, Math.max(15, state.fs + d)); store.set('fs', state.fs);
+  document.documentElement.style.setProperty('--fs', state.fs+'px');
+  tone(d>0 ? 880 : 440, .1, 'triangle'); toast('字體大小：'+state.fs+'px');
+}
+
+function renderStats(){
+  const cats = new Set(groups.flatMap(g=>g.cats));
+  const s = [
+    ['🌐', rows.length, '個網頁', 'var(--pink)'],
+    ['📦', groups.length, '個主題', 'var(--blue)'],
+    ['🏷️', cats.size, '種分類', 'var(--green)'],
+    ['❤️', favs.size, '個收藏', 'var(--orange)'],
+  ];
+  $('#stats').innerHTML = s.map(([ic,n,l,c]) =>
+    `<div class="stat" style="--c:${c}"><div class="n" data-n="${n}">0</div><div class="l">${ic} ${l}</div></div>`).join('');
+  // 數字跳動動畫
+  document.querySelectorAll('.stat .n').forEach(el => {
+    const target = +el.dataset.n; let cur = 0; const step = Math.max(1, Math.ceil(target/30));
+    const t = setInterval(() => { cur = Math.min(target, cur+step); el.textContent = cur; if(cur>=target) clearInterval(t); }, 25);
+  });
+}
+
+function renderChips(){
+  const count = {};
+  groups.forEach(g => g.cats.forEach(c => count[c] = (count[c]||0) + g.items.length));
+  const list = [{name:'全部', icon:'🌈'}, ...CATS, {name:'其他', icon:'✨'}].filter(c => c.name==='全部' || count[c.name]);
+  $('#chips').innerHTML = list.map((c,i) =>
+    `<button class="chip ${state.cat===c.name?'on':''}" data-cat="${c.name}" style="--c:${PALETTE[i%PALETTE.length]}">${c.icon} ${c.name} <small>${c.name==='全部'?rows.length:count[c.name]}</small></button>`).join('');
+  $('#chips').onclick = e => {
+    const b = e.target.closest('.chip'); if(!b) return;
+    state.cat = b.dataset.cat;
+    document.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b));
+    tone(523 + [...b.parentNode.children].indexOf(b)*60, .12, 'triangle');
+    render();
+  };
+}
+
+function hl(text){
+  if(!state.q) return esc(text);
+  const words = state.q.split(/\s+/).filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  return esc(text).replace(new RegExp('('+words.map(w=>esc(w)).join('|')+')','gi'), '<mark>$1</mark>');
+}
+function matches(r){
+  if(!state.q) return true;
+  const hay = (r.title+' '+r.key+' '+r.url+' '+r.cats.join(' ')).toLowerCase();
+  return state.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+}
+
+let lastCount = -1;
+function render(){
+  // 先篩選個別網頁，再依模式組成卡片
+  const okRow = r => matches(r) && (state.cat==='全部' || r.cats.includes(state.cat));
+  let cards;
+  if(state.group){
+    cards = groups.map(g => ({...g, items: g.items.filter(okRow)})).filter(g => g.items.length);
+  }else{
+    cards = rows.filter(okRow).map(r => ({title:r.title, cats:r.cats, items:[r], i:r.i}));
+  }
+  if(state.favOnly) cards = cards.filter(c => favs.has(c.title));
+  const hot = c => c.items.reduce((s,r)=>s+(clicks[r.url]||0),0);
+  if(state.sort==='az') cards.sort((a,b)=>a.title.localeCompare(b.title,'zh-Hant'));
+  else if(state.sort==='ver') cards.sort((a,b)=>b.items.length-a.items.length || a.i-b.i);
+  else if(state.sort==='hot') cards.sort((a,b)=>hot(b)-hot(a) || a.i-b.i);
+  else cards.sort((a,b)=>a.i-b.i);
+
+  const n = cards.reduce((s,c)=>s+c.items.length,0);
+  $('#hint').innerHTML = `🎯 找到 <b>${n}</b> 個網頁（${cards.length} 張卡片）${state.q?'，關鍵字「'+esc(state.q)+'」':''}　・　小技巧：按 <kbd>/</kbd> 快速搜尋、<kbd>Esc</kbd> 清除`;
+  if(lastCount !== -1 && n !== lastCount && n === 0) sfx.none();
+  lastCount = n;
+
+  if(!cards.length){
+    $('#main').innerHTML = `<div class="empty"><p style="font-size:3rem;margin:0">🙈</p>找不到符合的網頁，換個關鍵字試試看吧！</div>`;
+    return;
+  }
+  $('#main').innerHTML = `<div class="grid ${state.list?'list':''}">` + cards.map((c, idx) => {
+    const col = colorOf(c.title), first = c.items[0];
+    const multi = c.items.length > 1;
+    const vers = multi ? `<div class="versions">${c.items.map((r,k) =>
+        `<a class="ver" href="${esc(r.url)}" target="_blank" rel="noopener" data-url="${esc(r.url)}" title="${esc(r.url)}">版本 ${k+1}${state.q && matches(r) && r.key.toLowerCase().includes(state.q.toLowerCase()) ? ' ⭐':''}</a>`).join('')}</div>`
+      : `<div class="url">🔗 ${hl(first.url)}</div>`;
+    return `<article class="card" style="--c:${col};--cl:${light(col)};animation-delay:${Math.min(idx,30)*18}ms">
+      <button class="fav ${favs.has(c.title)?'on':''}" data-t="${esc(c.title)}" title="收藏" aria-label="收藏">❤️</button>
+      <div class="top">
+        <div class="emoji">${iconOf(c.cats)}</div>
+        <div style="flex:1;padding-right:30px">
+          <h3><a href="${esc(first.url)}" target="_blank" rel="noopener" data-url="${esc(first.url)}">${hl(c.title)}</a></h3>
+          <div class="tags">${c.cats.map(t=>`<span class="tag">${t}</span>`).join('')}${multi?`<span class="tag">共 ${c.items.length} 個版本</span>`:''}</div>
+        </div>
+      </div>
+      ${vers}
+      <div class="actions">
+        <a class="btn" href="${esc(first.url)}" target="_blank" rel="noopener" data-url="${esc(first.url)}" style="text-decoration:none;background:${light(col)}">🚀 開啟網頁</a>
+        <button class="btn" data-copy="${esc(first.url)}">📋 複製網址</button>
+        ${first.repo ? `<a class="btn" href="${esc(first.repo)}" target="_blank" rel="noopener" data-url="${esc(first.repo)}" style="text-decoration:none">💻 原始碼</a>` : ''}
+      </div>
+    </article>`;
+  }).join('') + '</div>';
+}
+
+function toggleFav(t, btn){
+  if(favs.has(t)){ favs.delete(t); btn.classList.remove('on'); sfx.unfav(); toast('💔 已取消收藏'); }
+  else{ favs.add(t); btn.classList.add('on'); sfx.fav(); toast('❤️ 已加入收藏'); burst(btn); }
+  store.set('favs', [...favs]);
+  const el = document.querySelectorAll('.stat .n')[3]; if(el) el.textContent = favs.size;
+  if(state.favOnly) render();
+}
+function countClick(url){ clicks[url] = (clicks[url]||0) + 1; store.set('clicks', clicks); }
+function copy(text){
+  const done = () => { tone(1047,.1,'triangle'); toast('📋 網址已複製！'); };
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done){
+  const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+  try{ document.execCommand('copy'); done(); }catch(e){} t.remove();
+}
+let toastTimer;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 1600); }
+
+/* ====== 隨機探索（拉霸機效果） ====== */
+let pick = null, spinning = false;
+function openRandom(){ $('#modal').classList.add('show'); spin(); }
+function closeModal(){ $('#modal').classList.remove('show'); sfx.click(); }
+function spin(){
+  if(spinning || !rows.length) return; spinning = true;
+  const pool = rows.filter(r => state.cat==='全部' || r.cats.includes(state.cat));
+  const src = pool.length ? pool : rows;
+  let n = 0; const total = 22; $('#goBtn').style.visibility = 'hidden';
+  const step = () => {
+    pick = src[Math.floor(Math.random()*src.length)];
+    $('#slot').innerHTML = `<div>${iconOf(pick.cats)} ${esc(pick.title)}<div style="font-size:.9rem;color:var(--muted);font-weight:400;margin-top:6px">${esc(pick.url)}</div></div>`;
+    $('#slot').style.background = light(colorOf(pick.title));
+    sfx.tick(); n++;
+    if(n < total) setTimeout(step, 35 + n*n*.5);
+    else{ spinning = false; $('#goBtn').href = pick.url; $('#goBtn').style.visibility = 'visible'; sfx.win(); confetti(40); }
+  };
+  step();
+}
+
+/* ====== 彩帶與泡泡特效 ====== */
+function confetti(n){
+  for(let i=0;i<n;i++){
+    const c = document.createElement('div'); c.className = 'confetti';
+    c.style.background = PALETTE[i%PALETTE.length];
+    c.style.left = (Math.random()*100)+'vw'; c.style.top = '-20px';
+    document.body.appendChild(c);
+    const x = (Math.random()-.5)*300, r = Math.random()*720;
+    c.animate([{transform:'translate(0,0) rotate(0)', opacity:1},{transform:`translate(${x}px,105vh) rotate(${r}deg)`, opacity:.8}],
+      {duration:1800+Math.random()*1400, easing:'cubic-bezier(.2,.6,.4,1)'}).onfinish = () => c.remove();
+  }
+}
+function burst(el){
+  const b = el.getBoundingClientRect();
+  for(let i=0;i<12;i++){
+    const c = document.createElement('div'); c.className = 'confetti'; c.textContent = '';
+    c.style.background = PALETTE[i%PALETTE.length]; c.style.borderRadius = '50%';
+    c.style.left = (b.left + b.width/2)+'px'; c.style.top = (b.top + b.height/2)+'px';
+    document.body.appendChild(c);
+    const a = i/12*Math.PI*2;
+    c.animate([{transform:'translate(0,0) scale(1)'},{transform:`translate(${Math.cos(a)*60}px,${Math.sin(a)*60}px) scale(0)`}],
+      {duration:600, easing:'ease-out'}).onfinish = () => c.remove();
+  }
+}
+(function bubbles(){
+  const box = $('#bubbles');
+  for(let i=0;i<14;i++){
+    const s = document.createElement('span'), size = 30 + Math.random()*90;
+    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;background:${PALETTE[i%PALETTE.length]};animation-duration:${18+Math.random()*22}s;animation-delay:${-Math.random()*30}s`;
+    box.appendChild(s);
+  }
+})();
+
+loadCSV();
+</script>
+</body>
+</html>
