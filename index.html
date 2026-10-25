@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GitHub 網址百寶箱</title>
 <meta name="description" content="從 CSV 檔動態讀取的 GitHub Pages 網址瀏覽與搜尋網頁">
+<meta name="theme-color" content="#8338ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="網址百寶箱">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
 <style>
 :root{
   --bg1:#fff7e6; --bg2:#e8f7ff; --bg3:#f3ecff;
@@ -125,6 +132,7 @@ footer{text-align:center;color:var(--muted);font-size:.95rem;margin-top:40px}
 @media (max-height:900px), (max-width:640px){ .panel{position:static} }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<link rel="stylesheet" href="./responsive.css">
 </head>
 <body>
 <div class="bubbles" id="bubbles"></div>
@@ -567,5 +575,6 @@ function burst(el){
 
 loadCSV();
 </script>
+<script src="./pwa.js" defer></script>
 </body>
 </html>
